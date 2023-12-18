@@ -19,6 +19,7 @@ import {
   useSuspenseQuery,
 } from '@tanstack/react-query'
 import axios from 'axios'
+import { z } from 'zod'
 
 type PostType = {
   id: string
@@ -125,7 +126,7 @@ function PostsRouteComponent() {
               <li key={post.id} className="whitespace-nowrap">
                 <Link
                   to={postRoute.to}
-                  params={{
+                  search={{
                     postId: post.id,
                   }}
                   className="block py-1 text-blue-800 hover:text-blue-600"
@@ -164,10 +165,14 @@ const postQueryOptions = (postId: string) =>
 
 const postRoute = new Route({
   getParentRoute: () => postsRoute,
-  path: '$postId',
+  path: 'post',
+  validateSearch: z.object({postId: z.coerce.string().catch('1')}),
   errorComponent: PostErrorComponent,
-  loader: ({ context: { queryClient }, params: { postId } }) =>
-    queryClient.ensureQueryData(postQueryOptions(postId)),
+  beforeLoad:({search}) => {
+      return {queryOptions: postQueryOptions(search.postId)}
+  },
+  loader: ({ context: { queryClient, queryOptions }}) =>
+    queryClient.ensureQueryData(queryOptions),
   component: PostRouteComponent,
 })
 
@@ -180,8 +185,8 @@ function PostErrorComponent({ error }: ErrorRouteProps) {
 }
 
 function PostRouteComponent() {
-  const { postId } = postRoute.useParams()
-  const postQuery = useSuspenseQuery(postQueryOptions(postId))
+  const {queryOptions} = postRoute.useRouteContext();
+  const postQuery = useSuspenseQuery(queryOptions);
   const post = postQuery.data
 
   return (
@@ -202,7 +207,7 @@ const queryClient = new QueryClient()
 // Set up a Router instance
 const router = new Router({
   routeTree,
-  defaultPreload: 'intent',
+  defaultPreload:  false,
   context: {
     queryClient,
   },
